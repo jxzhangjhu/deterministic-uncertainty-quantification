@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from torchvision import models
+
+from utils.wide_resnet import WideResNet
 
 
 class ResNet_DUQ(nn.Module):
@@ -22,14 +23,7 @@ class ResNet_DUQ(nn.Module):
         )
         nn.init.kaiming_normal_(self.W, nonlinearity="relu")
 
-        self.resnet = models.resnet18(pretrained=False, num_classes=model_output_size)
-
-        # Adapted resnet from:
-        # https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
-        self.resnet.conv1 = nn.Conv2d(
-            3, 64, kernel_size=3, stride=1, padding=1, bias=False
-        )
-        self.resnet.maxpool = nn.Identity()
+        self.resnet = WideResNet(num_classes=model_output_size)
 
         self.register_buffer("N", torch.zeros(num_classes) + 13)
         self.register_buffer(

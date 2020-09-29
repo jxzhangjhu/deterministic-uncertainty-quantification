@@ -61,7 +61,7 @@ def main(
     )
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=[25, 50, 75], gamma=0.2
+        optimizer, milestones=[60, 120, 160], gamma=0.2
     )
 
     def bce_loss_fn(y_pred, y):
@@ -174,11 +174,11 @@ def main(
     )
 
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=1000, shuffle=False, **kwargs
+        val_dataset, batch_size=batch_size, shuffle=False, **kwargs
     )
 
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=1000, shuffle=False, **kwargs
+        test_dataset, batch_size=batch_size, shuffle=False, **kwargs
     )
 
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -249,7 +249,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--epochs", type=int, default=75, help="Number of epochs to train (default: 75)"
+        "--epochs",
+        type=int,
+        default=200,
+        help="Number of epochs to train (default: 200)",
     )
 
     parser.add_argument(
