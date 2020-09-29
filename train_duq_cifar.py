@@ -28,9 +28,9 @@ def main(
     gamma,
     weight_decay,
     final_model,
+    output_dir,
 ):
-    name = f"DUQ_{length_scale}__{l_gradient_penalty}_{gamma}_{centroid_size}"
-    writer = SummaryWriter(comment=name)
+    writer = SummaryWriter(log_dir="runs/" + output_dir)
 
     ds = all_datasets["CIFAR10"]()
     input_size, num_classes, dataset, test_dataset = ds
@@ -227,21 +227,13 @@ def main(
 
         scheduler.step()
 
-        if trainer.state.epoch > 65:
-            torch.save(
-                model.state_dict(), f"saved_models/{name}_{trainer.state.epoch}.pt"
-            )
-
-    pbar = ProgressBar(dynamic_ncols=True)
-    pbar.attach(trainer)
-
     trainer.run(train_loader, max_epochs=epochs)
-
     evaluator.run(test_loader)
     acc = evaluator.state.metrics["accuracy"]
 
     print(f"Test - Accuracy {acc:.4f}")
 
+    torch.save(model.state_dict(), f"runs/{output_dir}/model.pt")
     writer.close()
 
 
@@ -308,6 +300,10 @@ if __name__ == "__main__":
         "--weight_decay", type=float, default=5e-4, help="Weight decay (default: 5e-4)"
     )
 
+    parser.add_argument(
+        "--output_dir", type=str, default=None, help="set output folder"
+    )
+
     # Below setting cannot be used for model selection,
     # because the validation set equals the test set.
     parser.add_argument(
@@ -321,6 +317,6 @@ if __name__ == "__main__":
     kwargs = vars(args)
     print("input args:\n", json.dumps(kwargs, indent=4, separators=(",", ":")))
 
-    pathlib.Path("saved_models").mkdir(exist_ok=True)
+    pathlib.Path("runs/" + args.output_dir).mkdir(exist_ok=True)
 
     main(**kwargs)
