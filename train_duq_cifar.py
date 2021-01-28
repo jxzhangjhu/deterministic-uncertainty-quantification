@@ -190,7 +190,7 @@ def main(
 
         writer.add_scalar("Loss/train", loss, trainer.state.epoch)
 
-        if trainer.state.epoch % 5 == 0 or trainer.state.epoch > 65:
+        if trainer.state.epoch % 5 == 0 or trainer.state.epoch > 195:
             accuracy, auroc = get_cifar_svhn_ood(model)
             print(f"Test Accuracy: {accuracy}, AUROC: {auroc}")
             writer.add_scalar("OoD/test_accuracy", accuracy, trainer.state.epoch)
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--l_gradient_penalty",
         type=float,
-        default=0,
+        default=0.5,
         help="Weight for gradient penalty (default: 0)",
     )
 
