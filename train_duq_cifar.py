@@ -8,16 +8,20 @@ import torch.nn.functional as F
 import torch.utils.data
 from torch.utils.tensorboard.writer import SummaryWriter
 
+from torchvision.models import resnet18
+
 from ignite.engine import Events, Engine
 from ignite.metrics import Accuracy, Average, Loss
 from ignite.contrib.handlers import ProgressBar
 
+from utils.wide_resnet import WideResNet
 from utils.resnet_duq import ResNet_DUQ
 from utils.datasets import all_datasets
 from utils.evaluate_ood import get_cifar_svhn_ood, get_auroc_classification
 
 
 def main(
+    architecture,
     batch_size,
     epochs,
     length_scale,
@@ -51,8 +55,13 @@ def main(
             test_dataset.transform
         )  # Test time preprocessing for validation
 
+    if architecture == "WRN":
+        model_class = WideResNet
+    elif architecture == "ResNet18":
+        model_class = resnet18
+
     model = ResNet_DUQ(
-        input_size, num_classes, centroid_size, model_output_size, length_scale, gamma
+        model_class, num_classes, centroid_size, model_output_size, length_scale, gamma
     )
     model = model.cuda()
 
@@ -166,6 +175,9 @@ def main(
 
     metric = Loss(calc_gradient_penalty, output_transform=output_transform_gp)
     metric.attach(evaluator, "gradient_penalty")
+
+    pbar = ProgressBar(dynamic_ncols=True)
+    pbar.attach(trainer)
 
     kwargs = {"num_workers": 4, "pin_memory": True}
 

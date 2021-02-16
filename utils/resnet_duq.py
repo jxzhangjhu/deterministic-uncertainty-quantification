@@ -1,13 +1,11 @@
 import torch
 import torch.nn as nn
 
-from utils.wide_resnet import WideResNet
-
 
 class ResNet_DUQ(nn.Module):
     def __init__(
         self,
-        input_size,
+        model_class,
         num_classes,
         centroid_size,
         model_output_size,
@@ -23,7 +21,7 @@ class ResNet_DUQ(nn.Module):
         )
         nn.init.kaiming_normal_(self.W, nonlinearity="relu")
 
-        self.resnet = WideResNet(num_classes=model_output_size)
+        self.feature_extractor = model_class(num_classes=model_output_size)
 
         self.register_buffer("N", torch.zeros(num_classes) + 13)
         self.register_buffer(
@@ -46,7 +44,7 @@ class ResNet_DUQ(nn.Module):
     def update_embeddings(self, x, y):
         self.N = self.gamma * self.N + (1 - self.gamma) * y.sum(0)
 
-        z = self.resnet(x)
+        z = self.feature_extractor(x)
 
         z = torch.einsum("ij,mnj->imn", z, self.W)
         embedding_sum = torch.einsum("ijk,ik->jk", z, y)
@@ -54,7 +52,7 @@ class ResNet_DUQ(nn.Module):
         self.m = self.gamma * self.m + (1 - self.gamma) * embedding_sum
 
     def forward(self, x):
-        z = self.resnet(x)
+        z = self.feature_extractor(x)
         y_pred = self.rbf(z)
 
         return z, y_pred
