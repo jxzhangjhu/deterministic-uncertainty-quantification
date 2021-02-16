@@ -34,7 +34,7 @@ def main(
     final_model,
     output_dir,
 ):
-    writer = SummaryWriter(log_dir="runs/" + output_dir)
+    writer = SummaryWriter(log_dir=output_dir)
 
     ds = all_datasets["CIFAR10"]()
     input_size, num_classes, dataset, test_dataset = ds
@@ -130,7 +130,7 @@ def main(
         if l_gradient_penalty > 0:
             x.requires_grad_(True)
 
-        z, y_pred = model(x)
+        y_pred = model(x)
         y = F.one_hot(y, num_classes).float()
 
         loss = bce_loss_fn(y_pred, y)
@@ -157,7 +157,7 @@ def main(
 
         x.requires_grad_(True)
 
-        z, y_pred = model(x)
+        y_pred = model(x)
 
         return y_pred, y, x
 
@@ -202,7 +202,7 @@ def main(
 
         writer.add_scalar("Loss/train", loss, trainer.state.epoch)
 
-        if trainer.state.epoch % 5 == 0 or trainer.state.epoch > 195:
+        if trainer.state.epoch > 195:
             accuracy, auroc = get_cifar_svhn_ood(model)
             print(f"Test Accuracy: {accuracy}, AUROC: {auroc}")
             writer.add_scalar("OoD/test_accuracy", accuracy, trainer.state.epoch)
@@ -235,8 +235,6 @@ def main(
         writer.add_scalar("GP/valid", GP, trainer.state.epoch)
         writer.add_scalar("Accuracy/valid", acc, trainer.state.epoch)
 
-        print(f"Centroid norm: {torch.norm(model.m / model.N, dim=0)}")
-
         scheduler.step()
 
     trainer.run(train_loader, max_epochs=epochs)
@@ -251,6 +249,13 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--architecture",
+        default="ResNet18",
+        choices=["ResNet18", "WRN"],
+        help="Pick an architecture",
+    )
 
     parser.add_argument(
         "--epochs",
@@ -313,7 +318,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--output_dir", type=str, default=None, help="set output folder"
+        "--output_dir", type=str, default="results", help="set output folder"
     )
 
     # Below setting cannot be used for model selection,

@@ -12,6 +12,7 @@ from utils.datasets import (
 
 
 def prepare_ood_datasets(true_dataset, ood_dataset):
+    # Preprocess OoD dataset same as true dataset
     ood_dataset.transform = true_dataset.transform
 
     datasets = [true_dataset, ood_dataset]
@@ -39,7 +40,7 @@ def loop_over_dataloader(model, dataloader):
             data = data.cuda()
             target = target.cuda()
 
-            output = model(data)[1]
+            output = model(data)
             kernel_distance, pred = output.max(1)
 
             accuracy = pred.eq(target)

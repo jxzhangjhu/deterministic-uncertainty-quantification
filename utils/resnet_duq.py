@@ -55,4 +55,4 @@ class ResNet_DUQ(nn.Module):
         z = self.feature_extractor(x)
         y_pred = self.rbf(z)
 
-        return z, y_pred
+        return y_pred
