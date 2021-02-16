@@ -38,7 +38,7 @@ The FashionMNIST experiment is implemented in [train\_duq\_fm.py](train_duq_fm.p
 For both experiments, the paper's default are hardcoded and can be changed in place.
 
 The ResNet18 based CIFAR experiments are implemented in [train\_duq\_cifar.py](train_duq_cifar.py).
-All command line parameter defaults are as listed in the experimental details in Appendix A of the paper.
+All command line parameter defaults are as listed in the experimental details in Appendix A of the paper with the exception of training for 200 epochs instead of 75 to accommodate the Wide ResNet.
 
 For example: CIFAR-10 with gradient penalty with weight 0.5 and full training set:
 
