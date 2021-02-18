@@ -11,7 +11,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torchvision.models import resnet18
 
 from ignite.engine import Events, Engine
-from ignite.metrics import Accuracy, Average, Loss
+from ignite.metrics import Average
 from ignite.contrib.handlers import ProgressBar
 
 from utils.wide_resnet import WideResNet
@@ -73,29 +73,6 @@ def main(
         optimizer, milestones=[60, 120, 160], gamma=0.2
     )
 
-    def bce_loss_fn(y_pred, y):
-        bce = F.binary_cross_entropy(y_pred, y, reduction="sum").div(
-            num_classes * y_pred.shape[0]
-        )
-        return bce
-
-    def output_transform_bce(output):
-        y_pred, y, x = output
-
-        y = F.one_hot(y, num_classes).float()
-
-        return y_pred, y
-
-    def output_transform_acc(output):
-        y_pred, y, x = output
-
-        return y_pred, y
-
-    def output_transform_gp(output):
-        y_pred, y, x = output
-
-        return x, y_pred
-
     def calc_gradients_input(x, y_pred):
         gradients = torch.autograd.grad(
             outputs=y_pred,
@@ -131,9 +108,9 @@ def main(
             x.requires_grad_(True)
 
         y_pred = model(x)
-        y = F.one_hot(y, num_classes).float()
 
-        loss = bce_loss_fn(y_pred, y)
+        y = F.one_hot(y, num_classes).float()
+        loss = F.binary_cross_entropy(y_pred, y, reduction="mean")
 
         if l_gradient_penalty > 0:
             loss += l_gradient_penalty * calc_gradient_penalty(x, y_pred)
@@ -159,7 +136,14 @@ def main(
 
         y_pred = model(x)
 
-        return y_pred, y, x
+        acc = (torch.argmax(y_pred, 1) == y).float().mean()
+
+        y = F.one_hot(y, num_classes).float()
+        bce = F.binary_cross_entropy(y_pred, y, reduction="mean")
+
+        gp = calc_gradient_penalty(x, y_pred)
+
+        return acc.item(), bce.item(), gp.item()
 
     trainer = Engine(step)
     evaluator = Engine(eval_step)
@@ -167,13 +151,13 @@ def main(
     metric = Average()
     metric.attach(trainer, "loss")
 
-    metric = Accuracy(output_transform=output_transform_acc)
+    metric = Average(output_transform=lambda x: x[0])
     metric.attach(evaluator, "accuracy")
 
-    metric = Loss(F.binary_cross_entropy, output_transform=output_transform_bce)
+    metric = Average(output_transform=lambda x: x[1])
     metric.attach(evaluator, "bce")
 
-    metric = Loss(calc_gradient_penalty, output_transform=output_transform_gp)
+    metric = Average(output_transform=lambda x: x[2])
     metric.attach(evaluator, "gradient_penalty")
 
     pbar = ProgressBar(dynamic_ncols=True)
@@ -185,12 +169,16 @@ def main(
         train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, **kwargs
     )
 
+    test_batch_size = 200
+    assert len(val_dataset) % test_batch_size == 0, "incorrect result averaging"
+    assert len(test_dataset) % test_batch_size == 0, "incorrect result averaging"
+
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, **kwargs
+        val_dataset, batch_size=test_batch_size, shuffle=False, **kwargs
     )
 
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False, **kwargs
+        test_dataset, batch_size=test_batch_size, shuffle=False, **kwargs
     )
 
     @trainer.on(Events.EPOCH_COMPLETED)

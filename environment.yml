@@ -4,10 +4,10 @@ channels:
     - defaults
 dependencies:
     - python
-    - pytorch=1.5.1
-    - torchvision=0.6.1
-    - cudatoolkit=10.1
-    - ignite=0.4.0
+    - pytorch=1.7.1
+    - torchvision=0.8.2
+    - cudatoolkit=11.0
+    - ignite=0.4.3
     - tqdm
     - tensorboard
     - numpy
