@@ -104,16 +104,16 @@ def main(
         x, y = batch
         x, y = x.cuda(), y.cuda()
 
-        if l_gradient_penalty > 0:
-            x.requires_grad_(True)
+        x.requires_grad_(True)
 
         y_pred = model(x)
 
         y = F.one_hot(y, num_classes).float()
-        loss = F.binary_cross_entropy(y_pred, y, reduction="mean")
+        bce = F.binary_cross_entropy(y_pred, y, reduction="mean")
 
-        if l_gradient_penalty > 0:
-            loss += l_gradient_penalty * calc_gradient_penalty(x, y_pred)
+        gp = l_gradient_penalty * calc_gradient_penalty(x, y_pred)
+
+        loss = bce + gp
 
         loss.backward()
         optimizer.step()
@@ -124,7 +124,7 @@ def main(
             model.eval()
             model.update_embeddings(x, y)
 
-        return loss.item()
+        return loss.item(), bce.item(), gp.item()
 
     def eval_step(engine, batch):
         model.eval()
@@ -148,16 +148,18 @@ def main(
     trainer = Engine(step)
     evaluator = Engine(eval_step)
 
-    metric = Average()
+    metric = Average(output_transform=lambda x: x[0])
     metric.attach(trainer, "loss")
 
     metric = Average(output_transform=lambda x: x[0])
     metric.attach(evaluator, "accuracy")
 
     metric = Average(output_transform=lambda x: x[1])
+    metric.attach(trainer, "bce")
     metric.attach(evaluator, "bce")
 
     metric = Average(output_transform=lambda x: x[2])
+    metric.attach(trainer, "gradient_penalty")
     metric.attach(evaluator, "gradient_penalty")
 
     pbar = ProgressBar(dynamic_ncols=True)
@@ -185,8 +187,13 @@ def main(
     def log_results(trainer):
         metrics = trainer.state.metrics
         loss = metrics["loss"]
+        bce = metrics["bce"]
+        GP = metrics["gradient_penalty"]
 
-        print(f"Train - Epoch: {trainer.state.epoch} Loss: {loss:.2f} ")
+        print(
+            f"Train - Epoch: {trainer.state.epoch} "
+            f"Loss: {loss:.2f} BCE: {bce:.2f} GP: {GP:.2f}"
+        )
 
         writer.add_scalar("Loss/train", loss, trainer.state.epoch)
 
