@@ -111,9 +111,9 @@ def main(
         y = F.one_hot(y, num_classes).float()
         bce = F.binary_cross_entropy(y_pred, y, reduction="mean")
 
-        gp = l_gradient_penalty * calc_gradient_penalty(x, y_pred)
+        gp = calc_gradient_penalty(x, y_pred)
 
-        loss = bce + gp
+        loss = bce + l_gradient_penalty * gp
 
         loss.backward()
         optimizer.step()
