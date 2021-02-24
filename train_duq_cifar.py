@@ -11,7 +11,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torchvision.models import resnet18
 
 from ignite.engine import Events, Engine
-from ignite.metrics import Average
+from ignite.metrics import Accuracy, Average, Loss
 from ignite.contrib.handlers import ProgressBar
 
 from utils.wide_resnet import WideResNet
@@ -23,7 +23,6 @@ from utils.evaluate_ood import get_cifar_svhn_ood, get_auroc_classification
 def main(
     architecture,
     batch_size,
-    epochs,
     length_scale,
     centroid_size,
     model_output_size,
@@ -56,8 +55,12 @@ def main(
         )  # Test time preprocessing for validation
 
     if architecture == "WRN":
+        epochs = 200
+        milestones = [60, 120, 160]
         model_class = WideResNet
     elif architecture == "ResNet18":
+        epochs = 75
+        milestones = [25, 50]
         model_class = resnet18
 
     model = ResNet_DUQ(
@@ -70,7 +73,7 @@ def main(
     )
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=[60, 120, 160], gamma=0.2
+        optimizer, milestones=milestones, gamma=0.2
     )
 
     def calc_gradients_input(x, y_pred):
@@ -124,7 +127,7 @@ def main(
             model.eval()
             model.update_embeddings(x, y)
 
-        return loss.item(), bce.item(), gp.item()
+        return loss.item()
 
     def eval_step(engine, batch):
         model.eval()
@@ -136,30 +139,26 @@ def main(
 
         y_pred = model(x)
 
-        acc = (torch.argmax(y_pred, 1) == y).float().mean()
-
-        y = F.one_hot(y, num_classes).float()
-        bce = F.binary_cross_entropy(y_pred, y, reduction="mean")
-
-        gp = calc_gradient_penalty(x, y_pred)
-
-        return acc.item(), bce.item(), gp.item()
+        return {"x": x, "y": y, "y_pred": y_pred}
 
     trainer = Engine(step)
     evaluator = Engine(eval_step)
 
-    metric = Average(output_transform=lambda x: x[0])
+    metric = Average()
     metric.attach(trainer, "loss")
 
-    metric = Average(output_transform=lambda x: x[0])
+    metric = Accuracy(output_transform=lambda out: (out["y_pred"], out["y"]))
     metric.attach(evaluator, "accuracy")
 
-    metric = Average(output_transform=lambda x: x[1])
-    metric.attach(trainer, "bce")
+    def bce_output_transform(out):
+        return (out["y_pred"], F.one_hot(out["y"], num_classes).float())
+
+    metric = Loss(F.binary_cross_entropy, output_transform=bce_output_transform)
     metric.attach(evaluator, "bce")
 
-    metric = Average(output_transform=lambda x: x[2])
-    metric.attach(trainer, "gradient_penalty")
+    metric = Loss(
+        calc_gradient_penalty, output_transform=lambda out: (out["x"], out["y_pred"])
+    )
     metric.attach(evaluator, "gradient_penalty")
 
     pbar = ProgressBar(dynamic_ncols=True)
@@ -171,33 +170,24 @@ def main(
         train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, **kwargs
     )
 
-    test_batch_size = 200
-    assert len(val_dataset) % test_batch_size == 0, "incorrect result averaging"
-    assert len(test_dataset) % test_batch_size == 0, "incorrect result averaging"
-
     val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=test_batch_size, shuffle=False, **kwargs
+        val_dataset, batch_size=batch_size, shuffle=False, **kwargs
     )
 
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=test_batch_size, shuffle=False, **kwargs
+        test_dataset, batch_size=batch_size, shuffle=False, **kwargs
     )
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_results(trainer):
         metrics = trainer.state.metrics
         loss = metrics["loss"]
-        bce = metrics["bce"]
-        GP = metrics["gradient_penalty"]
 
-        print(
-            f"Train - Epoch: {trainer.state.epoch} "
-            f"Loss: {loss:.2f} BCE: {bce:.2f} GP: {GP:.2f}"
-        )
+        print(f"Train - Epoch: {trainer.state.epoch} Loss: {loss:.2f}")
 
         writer.add_scalar("Loss/train", loss, trainer.state.epoch)
 
-        if trainer.state.epoch > 195:
+        if trainer.state.epoch > (epochs - 5):
             accuracy, auroc = get_cifar_svhn_ood(model)
             print(f"Test Accuracy: {accuracy}, AUROC: {auroc}")
             writer.add_scalar("OoD/test_accuracy", accuracy, trainer.state.epoch)
@@ -250,13 +240,6 @@ if __name__ == "__main__":
         default="ResNet18",
         choices=["ResNet18", "WRN"],
         help="Pick an architecture",
-    )
-
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=200,
-        help="Number of epochs to train (default: 200)",
     )
 
     parser.add_argument(

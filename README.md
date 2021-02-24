@@ -16,7 +16,7 @@ If the code or the paper has been useful in your research, please add a citation
 ## Dependencies
 
 The code is based on PyTorch and requires a few further dependencies, listed in [environment.yml](environment.yml).
-The code was tested with the versions specified in the environment file, but should work with newer versions as well.
+The code was tested with the versions specified in the environment file, but should work with newer versions as well (except for ignite=0.4.3).
 If you find an incompatibility, please let me know and I'll gladly update the code for the newest version of each library.
 
 ### Datasets
