@@ -5,7 +5,7 @@ import torch.nn as nn
 class ResNet_DUQ(nn.Module):
     def __init__(
         self,
-        model_class,
+        feature_extractor,
         num_classes,
         centroid_size,
         model_output_size,
@@ -21,7 +21,7 @@ class ResNet_DUQ(nn.Module):
         )
         nn.init.kaiming_normal_(self.W, nonlinearity="relu")
 
-        self.feature_extractor = model_class(num_classes=model_output_size)
+        self.feature_extractor = feature_extractor
 
         self.register_buffer("N", torch.zeros(num_classes) + 13)
         self.register_buffer(

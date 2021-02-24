@@ -57,14 +57,26 @@ def main(
     if architecture == "WRN":
         epochs = 200
         milestones = [60, 120, 160]
-        model_class = WideResNet
+        feature_extractor = WideResNet(num_classes=model_output_size)
     elif architecture == "ResNet18":
         epochs = 75
         milestones = [25, 50]
-        model_class = resnet18
+        feature_extractor = resnet18(num_classes=model_output_size)
+
+        # Adapted resnet from:
+        # https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
+        feature_extractor.conv1 = torch.nn.Conv2d(
+            3, 64, kernel_size=3, stride=1, padding=1, bias=False
+        )
+        feature_extractor.maxpool = torch.nn.Identity()
 
     model = ResNet_DUQ(
-        model_class, num_classes, centroid_size, model_output_size, length_scale, gamma
+        feature_extractor,
+        num_classes,
+        centroid_size,
+        model_output_size,
+        length_scale,
+        gamma,
     )
     model = model.cuda()
 
@@ -228,7 +240,7 @@ def main(
 
     print(f"Test - Accuracy {acc:.4f}")
 
-    torch.save(model.state_dict(), f"runs/{output_dir}/model.pt")
+    torch.save(model.state_dict(), f"{output_dir}/model.pt")
     writer.close()
 
 
