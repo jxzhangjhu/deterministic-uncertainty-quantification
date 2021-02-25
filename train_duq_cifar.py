@@ -33,7 +33,7 @@ def main(
     final_model,
     output_dir,
 ):
-    writer = SummaryWriter(log_dir=output_dir)
+    writer = SummaryWriter(log_dir=f"runs/{output_dir}")
 
     ds = all_datasets["CIFAR10"]()
     input_size, num_classes, dataset, test_dataset = ds
@@ -240,7 +240,7 @@ def main(
 
     print(f"Test - Accuracy {acc:.4f}")
 
-    torch.save(model.state_dict(), f"{output_dir}/model.pt")
+    torch.save(model.state_dict(), f"runs/{output_dir}/model.pt")
     writer.close()
 
 
